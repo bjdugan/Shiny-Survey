@@ -2,6 +2,7 @@
 
 library(dplyr)
 library(tidyr)
+library(purrr)
 library(tibble)
 library(odbc)
 library(DBI)
@@ -75,12 +76,10 @@ institutions <- tibble(
 n_respondents <- 25000
 
 set.seed(123)
-responses <- nest_join(items, response_options, by = "response_set") |>
+responses <- left_join(items, response_options, by = "response_set",
+                       relationship = "many-to-many") |>
+  select(item, value) |>
   (\(x) replicate(n_respondents, x, simplify = FALSE))() |>
-  map(unnest, response_options) |>
-  # assign id from list position/index
-  imap(mutate) |>
-  map(select, id = last_col(), item, value) |>
   # randomly select a response
   map(slice_sample, by = item) |>
   # create a small number of non-respondents: 10%
@@ -89,8 +88,10 @@ responses <- nest_join(items, response_options, by = "response_set") |>
   # add a little bit of itemwise missing values
   map(mutate,
       x = sample(c(FALSE, TRUE), nrow(items), replace = TRUE, prob = c(.1, .9)),
-      value = if_else(x, value, NA_integer_),
-      x = NULL) |>
+      value = if_else(x, value, NA_integer_)) |>
+  # assign id from list position/index
+  imap(mutate) |>
+  map(select, id = last_col(), item, value) |>
   bind_rows()
 
 # respondent information, assuming census administration
@@ -107,7 +108,6 @@ respondents <- tibble(
 nest_join(respondents, responses, by = "id")
 nest_join(institutions, respondents, by = "unitid")
 
-
 # create SQLite database ####
 con <- dbConnect(RSQLite::SQLite(), ":memory:")
 
@@ -121,8 +121,10 @@ map2(names(tables), tables, \(x, y) dbWriteTable(con, x, y))
 
 # confirm
 tbl(con, "items")
-
 tbl(con, "responses")
+
+# add PK and FK constraints?
+
 # close connection and save
 RSQLite::sqliteCopyDatabase(con, "nsse.db")
 
