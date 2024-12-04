@@ -111,7 +111,6 @@ nest_join(institutions, respondents, by = "unitid")
 # create SQLite database ####
 con <- dbConnect(RSQLite::SQLite(), ":memory:")
 
-# very lazy, will not work with any other objects present
 tables <- list(institutions, respondents, responses, questions, items,
                response_options) |>
   set_names(c("institutions", "respondents", "responses", "questions", "items",
