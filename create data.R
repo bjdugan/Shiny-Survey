@@ -126,5 +126,6 @@ tbl(con, "responses")
 
 # close connection and save
 RSQLite::sqliteCopyDatabase(con, "nsse.db")
+RSQLite::sqliteCopyDatabase(con, "nsse.sqlite")
 
 dbDisconnect(con)
