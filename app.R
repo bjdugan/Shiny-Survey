@@ -21,30 +21,32 @@ valid_items <- tbl(con, "responses") |>
   head() |>
   collect()
 
-# dictionary
-y <- left_join(
-  filter(tbl(con, "items"), item %in% c("sbmyself", "sbvalued", "sbcommunity")), # input$compare_var
+these_items <- c("sbmyself", "sbvalued", "sbcommunity")
+
+# dictionary - could be unfiltered view?
+dict <- left_join(
+  filter(tbl(con, "items"), item %in% these_items), # input$compare_var
   tbl(con, "questions"),
   by = "question_num") |>
-  collect()
+  left_join(tbl(con, "response_options"), by = "response_set")
 
 # data - filter later
-x <- tbl(con, "institutions") |>
-  #filter(control == input$group_var1 & region == input$group_var2) |>
-  left_join(
-    tbl(con, "responses") |>
-      filter(item %in% y$item & !is.na(value)) |> # input$compare_var
-      left_join(
-        tbl(con, "respondents") |>
-          select(id, unitid, class),
-        by = "id"),
-    by = "unitid") |>
-  left_join(tbl(con, "items") |>
-              select(item, label, response_set),
-            by = "item") |>
-  left_join(tbl(con, "response_options"), by = c("response_set", "value")) |>
-  collect()
+data <- left_join(tbl(con, "institutions"),
+                         tbl(con, "respondents"), by = "unitid") |>
+  left_join(tbl(con, "responses"), by = "id") |>
+  filter(!is.na(value) & item %in% these_items ) |>
+  # could hold off and join after summarizing?
+  left_join(select(dict, item, value, response), by = c("item", "value")) |>
+  # for correctly ordering response/value labels
+  arrange(item, value) |>
+  collect() |>
+  mutate(response = factor(value, labels = unique(response)),
+         # should cut size but will require some re-ordering for "unpaired" value-label sets
+         across(where(is.character), factor),
+       .by = item)
 
+# this maintains values as numeric (e.g. for statistical ops) and response as factor (plotting, lightweight)
+# count(data, item, value, response)
 
 # UI #####
 # mutipage where each page displays a different view and each nav_panel a different comparison group?
@@ -68,13 +70,12 @@ ui <- page_navbar(
                       select(unitid) |>
                       collect() |>
                       pull(),
-                    selected = 1,
+                    selected = 1
                     ),
-
         # choose item(s)
         varSelectInput(
           "compare_var",
-          label = "Variable to compare (coming soon):",
+          label = "Variable(s or set) to compare (TBA):",
           data = valid_items,
           selected = NULL,
           multiple = FALSE
@@ -110,17 +111,18 @@ ui <- page_navbar(
 server <- function(input, output) {
 
   output$plot1 <- renderPlot({
-    filter(x,
+    filter(data,
            unitid == input$unitid_i |
              (unitid != input$unitid_i &
                 control == input$group_var1 & region == input$group_var2)) |>
-      mutate(grp = if_else(unitid == input$unitid_i, 1, 0)) |>
+      mutate(grp = if_else(unitid == input$unitid_i, "Institution", "Comparison Group") |>
+               factor(levels = c("Institution", "Comparison Group"))) |>
       ggplot(aes(x = grp, y = value, fill = response)) +
       geom_col() +
       theme_minimal() +
       facet_wrap(~class) +
-      labs(title = pull(y, "question"),
-           subtitle = pull(y, "label"),
+      labs(title = pull(dict, "question"),
+           subtitle = pull(dict, "label"),
            x = "Class level",
            y = "Count")
   })
@@ -133,4 +135,26 @@ server <- function(input, output) {
 # Run the application ####
 shinyApp(ui = ui, server = server)
 
-# no such column
+# # for testing...keep wokring on this to match what i want
+# input <- list()
+# input$unitid_i <- 1
+# input$group_var1 <- "Public"
+# input$group_var2 <- "West"
+#
+# filter(data,
+#        unitid == input$unitid_i |
+#          (unitid != input$unitid_i &
+#             control == input$group_var1 & region == input$group_var2)) |>
+#   mutate(grp = if_else(unitid == input$unitid_i, "Institution", "Comparison Group") |>
+#            factor(levels = c("Institution", "Comparison Group"))) |>
+#   count(grp, class, item, value) |>
+#   mutate(n = n / sum(n) * 100, .by = c(grp, class, item)) |>
+#   ggplot(aes(x = grp, y = n)) +
+#   geom_col(position = "dodge") +
+#   theme_minimal() +
+#   coord_flip() +
+#   facet_wrap(~class) +
+#   labs(title = pull(dict, "question"),
+#        subtitle = pull(dict, "label"),
+#        x = "Class level",
+#        y = "Count")
