@@ -132,13 +132,22 @@ left_join(tbl(con, "items"), tbl(con, "questions"), by = "question_num") |>
   left_join(tbl(con, "response_options"), by = "response_set") |>
   explain()
 
+# if exists, drop then create
+dbExecute(con, "DROP VIEW IF EXISTS dictionary;")
+# adapted and tidied from show_query()/explain(); note `set` in back-tics as SET is reserved
 dbExecute(con,
           "CREATE VIEW dictionary AS
-          SELECT items.* FROM items
-          LEFT JOIN questions
-          ON (items.question_num = questions.question_num)
-          LEFT JOIN response_options
-          ON (items.response_set = response_options.response_set);")
+          SELECT question_num, item_alpha, survey_order, item, label,
+          COALESCE(LHS.response_set, response_options.response_set) AS response_set,
+          question, `set`, response, value
+          FROM (
+            SELECT items.*, question, `set`
+            FROM items
+            LEFT JOIN questions
+            ON (items.question_num = questions.question_num)
+          ) AS LHS
+          FULL JOIN response_options
+          ON (LHS.response_set = response_options.response_set);")
 # confirm
 tbl(con, "dictionary")
 

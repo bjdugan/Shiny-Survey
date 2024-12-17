@@ -24,7 +24,7 @@ valid_items <- tbl(con, "responses") |>
 these_items <- c("sbmyself", "sbvalued", "sbcommunity")
 
 # dictionary - could be unfiltered view?
-dict <- tlb(con, "dictionary") |>
+dict <- tbl(con, "dictionary") |>
   filter(item %in% these_items)
 
 # data - filter later
