@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # create mock survey data and metadata, based loosely on NSSE
 
 library(dplyr)
@@ -70,6 +71,9 @@ institutions <- tibble(
   region = sample(state.region, size = 20, replace = TRUE)
 )
 
+# institutions receive defaults based on US/Canada, consortium participation, otherwise is ..., region-control (we could coerce Canada to this but they ~all do provincial consortium, ), and all standard admins within national context.
+# implement here
+
 # respondent data ####
 # create random values for a small number of respondents, nested within institutions
 # maybe drop a few at random to simulate non-response, and add missing values throughout
@@ -123,6 +127,8 @@ tbl(con, "items")
 tbl(con, "responses")
 
 # add PK and FK constraints?
+
+# add View for dictionary, else...
 
 # close connection and save
 RSQLite::sqliteCopyDatabase(con, "nsse.db")
