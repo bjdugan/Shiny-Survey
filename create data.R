@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # create mock survey data and metadata, based loosely on NSSE
 
 library(dplyr)
@@ -128,10 +127,22 @@ tbl(con, "responses")
 
 # add PK and FK constraints?
 
-# add View for dictionary, else...
+# add View for dictionary, perhaps others...
+left_join(tbl(con, "items"), tbl(con, "questions"), by = "question_num") |>
+  left_join(tbl(con, "response_options"), by = "response_set") |>
+  explain()
+
+dbExecute(con,
+          "CREATE VIEW dictionary AS
+          SELECT items.* FROM items
+          LEFT JOIN questions
+          ON (items.question_num = questions.question_num)
+          LEFT JOIN response_options
+          ON (items.response_set = response_options.response_set);")
+# confirm
+tbl(con, "dictionary")
 
 # close connection and save
 RSQLite::sqliteCopyDatabase(con, "nsse.db")
-RSQLite::sqliteCopyDatabase(con, "nsse.sqlite")
 
 dbDisconnect(con)

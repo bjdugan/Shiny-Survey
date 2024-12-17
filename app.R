@@ -24,11 +24,8 @@ valid_items <- tbl(con, "responses") |>
 these_items <- c("sbmyself", "sbvalued", "sbcommunity")
 
 # dictionary - could be unfiltered view?
-dict <- left_join(
-  filter(tbl(con, "items"), item %in% these_items), # input$compare_var
-  tbl(con, "questions"),
-  by = "question_num") |>
-  left_join(tbl(con, "response_options"), by = "response_set")
+dict <- tlb(con, "dictionary") |>
+  filter(item %in% these_items)
 
 # data - filter later
 data <- left_join(tbl(con, "institutions"),
