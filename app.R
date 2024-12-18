@@ -7,9 +7,13 @@ library(bslib)
 library(ggplot2)
 
 # to-do ####
-# plot should split items (3 included) reactively
-# add values in titles based on selections
-# add summary table appropriate to data
+# split variables across pages programmatically
+# add FY/SR as radio button option? was in design but may not be needed
+# flesh out summary tables (freq, stats)
+# add placeholder for download/export buttons
+# revise plot to be minimally appropriate for data
+# add comparison group table(s) in db and transform groups to be checkbox input
+# add an "all" category for checkboxes and set to default; what values are populating if nothing selected? filter logic.
 
 # prep ####
 con <- dbConnect(RSQLite::SQLite(), "nsse.db")
@@ -21,17 +25,14 @@ valid_items <- tbl(con, "responses") |>
   head() |>
   collect()
 
-these_items <- c("sbmyself", "sbvalued", "sbcommunity")
-
 # dictionary - could be unfiltered view?
-dict <- tbl(con, "dictionary") |>
-  filter(item %in% these_items)
+dict <- tbl(con, "dictionary")
 
 # data - filter later
 data <- left_join(tbl(con, "institutions"),
                          tbl(con, "respondents"), by = "unitid") |>
   left_join(tbl(con, "responses"), by = "id") |>
-  filter(!is.na(value) & item %in% these_items ) |>
+  filter(!is.na(value) ) |>
   # could hold off and join after summarizing?
   left_join(select(dict, item, value, response), by = c("item", "value")) |>
   # for correctly ordering response/value labels
@@ -49,11 +50,9 @@ data <- left_join(tbl(con, "institutions"),
 # mutipage where each page displays a different view and each nav_panel a different comparison group?
 # 1st page can be simple barplot for item, both classes, and 1 group
 
-# maybe create table for selection here instead of querying constantly
-
 ui <- page_navbar(
   title = "Basic survey report",
-  theme = bs_theme(bootswatch = "vapor"),  # see https://bslib.shinyapps.io/themer-demo/
+  theme = bs_theme(bootswatch = "cerulean"),  # see https://bslib.shinyapps.io/themer-demo/
 
   # page 1 item comparison
   nav_panel(
@@ -69,13 +68,11 @@ ui <- page_navbar(
                       pull(),
                     selected = 1
                     ),
-        # choose item(s)
-        varSelectInput(
-          "compare_var",
-          label = "Variable(s or set) to compare (TBA):",
-          data = valid_items,
-          selected = NULL,
-          multiple = FALSE
+        # choose student filters
+        checkboxGroupInput("student_filter1",
+                    "Choose students",
+                    choices = unique(data$sex),
+                    selected = NULL # or unique(data$sex)?
         ),
         # choose comparison group(s)
         radioButtons("group_var1",
@@ -89,19 +86,25 @@ ui <- page_navbar(
                      selected = NULL
         )
       ),
+
       # containers for output
       card(
         card_header("Plot comparing data between {institution} and {some criteria}"),
         plotOutput("plot1")
       ),
-      card(
-        card_header("Summary table"),
-        textOutput("text1")
-        #tableOutput("table1")
+      layout_columns(
+        card(
+          card_header("Freqencies table"),
+          textOutput("text1")
+          #tableOutput("table1")
+        ),
+        card(
+          card_header("Statistical table"),
+          textOutput("text2")
+        )
       )
     )
   )
-  # page 2 etc.
 )
 
 # server ####
@@ -111,7 +114,9 @@ server <- function(input, output) {
     filter(data,
            unitid == input$unitid_i |
              (unitid != input$unitid_i &
-                control == input$group_var1 & region == input$group_var2)) |>
+                control == input$group_var1 &
+                region == input$group_var2) &
+             sex %in% input$student_filter1) |>
       mutate(grp = if_else(unitid == input$unitid_i, "Institution", "Comparison Group") |>
                factor(levels = c("Institution", "Comparison Group"))) |>
       ggplot(aes(x = grp, y = value, fill = response)) +
@@ -125,7 +130,8 @@ server <- function(input, output) {
   })
 
   #output$table1 <- renderTable()
-  output$text1 <- renderText("PLACEHOLDER A table with various summary statistics.")
+  output$text1 <- renderText("PLACEHOLDER A table with counts and percentages")
+  output$text2 <- renderText("PLACEHOLDER A table with statistical data")
 
 }
 
