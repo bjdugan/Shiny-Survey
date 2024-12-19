@@ -8,8 +8,9 @@ library(odbc)
 library(DBI)
 
 # to do:
-# - add peers tables similar to in RF,
+# - add peers tables similar to in RF
 # - review creation of responses as it slows down considerably with higher n
+# - consider extending set for core survey (e.g. "core-[EI]") to distinguish subsets based on constructs or adding a new variable "subset".
 
 # instrument codebooks ####
 # a table of each stem or question as it appears on the survey
@@ -125,7 +126,7 @@ map2(names(tables), tables, \(x, y) dbWriteTable(con, x, y))
 tbl(con, "items")
 tbl(con, "responses")
 
-# add PK and FK constraints?
+# add PK and FK constraints and then plot ERD with package dm (adding these should avoid needing toa dd them one at a time)
 
 # add View for dictionary, perhaps others...
 left_join(tbl(con, "items"), tbl(con, "questions"), by = "question_num") |>
