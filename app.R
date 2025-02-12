@@ -6,7 +6,11 @@ library(DBI)
 library(bslib)
 library(ggplot2)
 library(purrr)
+library(forcats)
+library(stringr)
+library(tidyr)
 source("create_nav_panel.r")
+source("plot_funs.r")
 
 # to-do ####
 # split variables across pages programmatically; requires either variable set to be subdivided e.g. 'core-DD', 'core-tm' while modules remain 'civ', as subsets arent' necesarily by-question (there are orphans), or, a second variable to capture the variation within the core survey, only really used by core survey, or perhaps expanded upon as the "constructs" by or within each question.
@@ -27,30 +31,33 @@ valid_items <- tbl(con, "responses") |>
   head() |>
   collect()
 
-# dictionary; until pages are functionally generated filter to sb* items
+# dictionary
 dict <- tbl(con, "dictionary") |>
   filter(response_set == "NSOV")
 
 # data - filter later
-data <- left_join(tbl(con, "institutions"),
+data <- left_join(tbl(con, "institutions") |>
+                    select(unitid, name),
                   tbl(con, "respondents"), by = "unitid") |>
   left_join(tbl(con, "responses"), by = "id") |>
-  filter(!is.na(value) ) |>
-  # could hold off and join after summarizing? right_ to keep only sb* items
-  right_join(select(dict, item, value, response), by = c("item", "value")) |>
+  filter(!is.na(value)) |>
+  right_join(select(dict, item, survey_order, label, value, response),
+             by = c("item", "value")) |>
   # for correctly ordering response/value labels
   arrange(item, value) |>
   collect() |>
   mutate(response = factor(value, labels = unique(response)),
+         label = factor(survey_order, labels = unique(str_wrap(label, 40))),
+         # simple comparison - institution vs all others
+         # grp = if_else(unitid == input$unitid_i, "g0", "g1") |>
+         #   factor(),
          # should cut size but will require some re-ordering for "unpaired" value-label sets
          across(where(is.character), factor),
          .by = item)
-
-# this maintains values as numeric (e.g. for statistical ops) and response as factor (plotting, lightweight)
-# count(data, item, value, response)
+# drop unused cols  select(unitid, name, )
 
 # pmap when n args expands; consider setting names for clarity and to avoid using plot1, table1, etc.
-panels <- c("Sense of Belonging", "Collaborative Learning",
+panels <- c("Collaborative Learning", "Sense of Belonging",
             "Higher-Order Learning") |>
   imap(create_nav_panel)
 
@@ -60,12 +67,12 @@ ui <- page_navbar(
   title = "Basic survey report",
   # see https://bslib.shinyapps.io/themer-demo/
   theme = bs_theme(bootswatch = "cerulean"),
-  header = "Your student responses", # not styled
+  header = "page_navbar header (not CSS'd)",
 
   # page_navbar will use same sidebar on every page
   sidebar = sidebar(
     # your institution (passed via credential system or...)
-    selectInput("unitid_i", "Unitid (hidden)",
+    selectInput("unitid_i", "Unitid (test only)",
                 choices = tbl(con, "institutions") |>
                   select(unitid) |>
                   collect() |>
@@ -89,58 +96,42 @@ ui <- page_navbar(
                  choices = pull(distinct(tbl(con, "institutions"), region)),
                  selected = NULL
     ),
-    radioButtons("plot_type1",
-                 label = "Show side-by-side bar plots or dumbells for distribution. (TBA)",
+    radioButtons("plot_type",
+                 label = "Show side-by-side bar plots or dumbells for distribution.",
                  choices = c("Distribution", "Differences"),
-                 selected = NULL
+                 selected = "Distribution"
     ),
-    selectInput("useInstColors",
-                "Try to use your institution's color palette (or pick one) and logo? (TBA)",
-                choices = c(TRUE, FALSE)
-    ),
+    # selectInput("useInstColors",
+    #             "Try to use your institution's color palette (or pick one) and logo? (TBA)",
+    #             choices = c(TRUE, FALSE)
+    # ),
     actionButton("download", "Download (TBA)")
   ), # end sidebar
 
-  # throws a warning b/c isn't nav or panel obj
-  p("This is a sample dashboard permitting users to explore NSSE data using R Shiny and other packages. The sidebar panel contains UI elements that interact with the server, i.e., allow a user to query the data. The pages will be generated functionally to capture known sets (EIs, HIPs, modules) and further interact with data, e.g., select a set of variables from a list to use dynamically as filters or variables on either side of the equation (DV or IV). Note that curly braces signify some will-be variable value. Comparison groups will be implemented in place of 'Choose a group,' which will have proper titles. This section might otherwise contain a {description} of item {set} and how it pertains to student engagement, with links to resources."),
 
   panels[[1]],
   panels[[2]],
   panels[[3]],
 
-  footer = "<small>Data notes: the data powering this app are fabricated and intended for demonstration purposes only. See create data.R at LINK[https://github.com/bjdugan/Shiny-Survey] for the R code. OMIT SCROLLBOX MAKE SMALL</small>"
-
-)
+  footer = HTML("<hr><small>Data notes: the data powering this app are fabricated and intended for demonstration purposes only.This note has literal HTML to make it small and add the HR above</small>")
+  )
 
 # server ####
 server <- function(input, output) {
 
-  plot_fun <- function(id) {
-    filter(data,
-           # this institution or all others in comp group/comp group stand-in
-           (unitid == input$unitid_i |
-              (unitid != input$unitid_i &
-                 control == input$group_var1 & region == input$group_var2)) &
-             sex %in% input$student_filter1) |>
-      mutate(grp = if_else(unitid == input$unitid_i, "Institution", "Comparison Group") |>
-               factor(levels = c("Institution", "Comparison Group"))) |>
-      ggplot(aes(x = grp, y = value, fill = response)) +
-      geom_col() +
-      theme_minimal() +
-      facet_wrap(~class) +
-      labs(title = pull(dict, "question"),
-           subtitle = pull(dict, "label"),
-           x = "Class level",
-           y = "Count")
-  }
+  data <- mutate(data, grp = if_else(unitid == 1, "g0", "g1") |>
+                   factor())
 
-  output$plot1 <- renderPlot({plot_fun("plot1")})
-  output$plot2 <- renderPlot({plot_fun("plot2")})
-  output$plot3 <- renderPlot({plot_fun("plot3")})
+  output$plot1 <- renderPlot({plot_fun("plot1", data, type = input$plot_type)})
+  output$plot2 <- renderPlot({plot_fun("plot2", data, type = input$plot_type)})
+  output$plot3 <- renderPlot({plot_fun("plot3", data, type = input$plot_type)})
 
-  #output$table1 <- renderTable()
-  output$text1 <- renderText("PLACEHOLDER A table with counts and ~weighted percentages")
-  output$text2 <- renderText("PLACEHOLDER A table with statistical data")
+
+  # repeating for each panel seems crazy!
+  output$freq1 <- renderText("PLACEHOLDER A table with counts and ~weighted percentages")
+  output$freq2 <- renderText("PLACEHOLDER A table with counts and ~weighted percentages")
+  output$freq3 <- renderText("PLACEHOLDER A table with counts and ~weighted percentages")
+
 
 }
 
