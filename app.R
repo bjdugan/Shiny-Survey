@@ -29,7 +29,7 @@ valid_items <- tbl(con, "responses") |>
 
 # dictionary; until pages are functionally generated filter to sb* items
 dict <- tbl(con, "dictionary") |>
-  filter(response_set == "SDNAS")
+  filter(response_set == "NSOV")
 
 # data - filter later
 data <- left_join(tbl(con, "institutions"),
