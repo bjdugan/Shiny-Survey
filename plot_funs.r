@@ -1,38 +1,45 @@
-library(ggplot2)
-library(odbc)
-library(dplyr)
-library(forcats)
-library(stringr)
-library(tidyr)
+theme_nsse <- function(
+    # default args, can be supplied to existing theme
+  base_size = 16,
+  base_family = "sans", # one of windowsFonts()
+  base_line_size = base_size /  22,
+  base_rect_size  = base_size / 22) {
+  windowsFonts(`Calibri` = windowsFont("Calibri")) # adding fonts in session
 
-con <- dbConnect(RSQLite::SQLite(), "nsse.db")
+  theme_minimal(
+    base_size = base_size,
+    base_family = "Calibri",
+    base_line_size = base_line_size,
+    base_rect_size = base_rect_size
+  ) %+replace%
+    theme(
+      # below, what theme_minimal adds to theme_bw
+      # axis.ticks = element_blank(),
+      # legend.background = element_blank(),
+      # legend.key = element_blank(),
+      # panel.background = element_blank(),
+      # panel.border = element_blank(),
+      # strip.background = element_blank(),
+      # plot.background = element_blank(),
+      # complete = TRUE
+      plot.title = element_text(colour = "#002D6D", hjust = 0), # text= to affect all
+      plot.subtitle = element_text(colour = "#002D6D", hjust = 0, size = rel(.9)),
+      plot.title.position = "plot",
+      axis.text = element_text(size = rel(.8)),
+      axis.text.x = element_text(color = "#A6A6A6"),
+      panel.grid.minor = element_blank(),
+      # for vert bars; x for horiz bars (reversed for coord_flip, regardless of order)
+      panel.grid.major.x = element_line(linewidth = 1),
+      panel.grid.major.y = element_blank(),
+      panel.background = element_rect(#fill = "#CCCCCC",
+        fill = "#D9D9D9",
+        color = "white"),
+      legend.position = "right", #looks better when flipped
+      complete = TRUE
+    )
+}
 
-dict <- tbl(con, "dictionary") |>
-  filter(response_set == "NSOV")
-
-data <- left_join(tbl(con, "institutions") |>
-                    select(unitid, name),
-                  tbl(con, "respondents"), by = "unitid") |>
-  left_join(tbl(con, "responses"), by = "id") |>
-  filter(!is.na(value)) |>
-  right_join(select(dict, item, survey_order, label, value, response), by = c("item", "value")) |>
-  # for correctly ordering response/value labels
-  arrange(item, value) |>
-  collect() |>
-  mutate(response = factor(value, labels = unique(response)),
-         #
-         label = factor(survey_order, labels = unique(str_wrap(label, 40))),
-         # simple comparison - institution vs all others
-         grp = if_else(unitid == input$unitid_i, "g0", "g1") |>
-           factor(),
-         # should cut size but will require some re-ordering for "unpaired" value-label sets
-         across(where(is.character), factor),
-         .by = item)
-  # drop unused cols  select(unitid, name, )
-
-
-
-plot_fun <- function(data, type = "stacked_col", weight = FALSE) {
+plot_fun <- function(id, data, type = "Distribution", weight = FALSE) {
   # choose a plot type based on some user input
 
   # probably better to extract summarization to db if possible or as separate function
@@ -41,7 +48,7 @@ plot_fun <- function(data, type = "stacked_col", weight = FALSE) {
   d <- count(data, grp, label, response, value) |>
     mutate(p = n / sum(n) * 100, .by = c(grp, label))
 
-  if (type == "dumbbell") {
+  if (type == "Differences") {
     # collapse categories inwardly so we have dichotomous measure
     # collapsed levels could be added in dict instead of hard-coded, e.g. response_col = "Infrequently" for "Never" and "Sometimes"
     # ^ probably necessary as collapsing varies by response set
@@ -53,7 +60,7 @@ plot_fun <- function(data, type = "stacked_col", weight = FALSE) {
       filter(response == "Frequently")
   }
 
-  if (type == "stacked_col") {
+  if (type == "Distribution") {
     # reverse factor order so earliest items appear at top
     plt <- ggplot(d, aes(x = p, y = fct_rev(label), fill = response)) +
       geom_col(position = "dodge") +
@@ -65,7 +72,7 @@ plot_fun <- function(data, type = "stacked_col", weight = FALSE) {
       facet_wrap(~grp) +
       scale_fill_brewer(type = "seq") +
       scale_x_continuous(limits = c(0, 100))
-  } else if (type == "dumbbell") {
+  } else if (type == "Differences") {
     # consider https://r-graph-gallery.com/web-extended-dumbbell-plot-ggplot2.html which has mean and sd as well
     # split data into g0, g1, where g0 provides base layer and g1 provides -ends.
     plt <- ggplot(d) +
@@ -73,17 +80,17 @@ plot_fun <- function(data, type = "stacked_col", weight = FALSE) {
                    aes(x = p, y = fct_rev(label),
                        xend = d[d$grp == "g1", ]$p,
                        yend = fct_rev(d[d$grp == "g1", ]$label)),
-                       linewidth = 2,
+                   linewidth = 2,
                    color = "grey") +
       geom_point(aes(x = p, y = fct_rev(label), color = grp, shape = grp),
                  size = 5) +
-      geom_text(aes(x = p, y = fct_rev(label), label = paste(round(p), "%")),
+      geom_text(aes(x = p, y = fct_rev(label), label = paste0(round(p), "%")),
                 nudge_y = .2)
     # scale according to diff?
   }
   # constant styling and elements regardless of plot type
   # most of this could be kep inside a custom theme instead of calling theme_minimal() and then theme()
-  plt <- plt + theme_minimal() +
+  plt <- plt + theme_nsse() +
     theme(legend.position = "bottom",
           panel.grid.major.y = element_blank(),
           panel.grid.minor.x = element_blank()
@@ -96,7 +103,7 @@ plot_fun <- function(data, type = "stacked_col", weight = FALSE) {
   return(plt)
 }
 # e.g.
-plot_fun(data, type = "dumbbell")
-plot_fun(data, type = "stacked_col")
+# plot_fun(data, type = "dumbbell")
+# plot_fun(data, type = "stacked_col")
 
 
