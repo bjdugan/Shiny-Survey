@@ -156,3 +156,4 @@ tbl(con, "dictionary")
 RSQLite::sqliteCopyDatabase(con, "nsse.db")
 
 dbDisconnect(con)
+
