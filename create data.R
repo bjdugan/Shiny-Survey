@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # create mock survey data and metadata, based loosely on NSSE
 
 library(dplyr)
@@ -9,8 +8,9 @@ library(odbc)
 library(DBI)
 
 # to do:
-# - add peers tables similar to in RF,
+# - add peers tables similar to in RF
 # - review creation of responses as it slows down considerably with higher n
+# - consider extending set for core survey (e.g. "core-[EI]") to distinguish subsets based on constructs or adding a new variable "subset".
 
 # instrument codebooks ####
 # a table of each stem or question as it appears on the survey
@@ -126,12 +126,33 @@ map2(names(tables), tables, \(x, y) dbWriteTable(con, x, y))
 tbl(con, "items")
 tbl(con, "responses")
 
-# add PK and FK constraints?
+# add PK and FK constraints and then plot ERD with package dm (adding these should avoid needing toa dd them one at a time)
 
-# add View for dictionary, else...
+# add View for dictionary, perhaps others...
+left_join(tbl(con, "items"), tbl(con, "questions"), by = "question_num") |>
+  left_join(tbl(con, "response_options"), by = "response_set") |>
+  explain()
+
+# if exists, drop then create
+dbExecute(con, "DROP VIEW IF EXISTS dictionary;")
+# adapted and tidied from show_query()/explain(); note `set` in back-tics as SET is reserved
+dbExecute(con,
+          "CREATE VIEW dictionary AS
+          SELECT question_num, item_alpha, survey_order, item, label,
+          COALESCE(LHS.response_set, response_options.response_set) AS response_set,
+          question, `set`, response, value
+          FROM (
+            SELECT items.*, question, `set`
+            FROM items
+            LEFT JOIN questions
+            ON (items.question_num = questions.question_num)
+          ) AS LHS
+          FULL JOIN response_options
+          ON (LHS.response_set = response_options.response_set);")
+# confirm
+tbl(con, "dictionary")
 
 # close connection and save
 RSQLite::sqliteCopyDatabase(con, "nsse.db")
-RSQLite::sqliteCopyDatabase(con, "nsse.sqlite")
 
 dbDisconnect(con)
