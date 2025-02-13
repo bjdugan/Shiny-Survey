@@ -52,14 +52,23 @@ plot_fun <- function(id, data, type = "Distribution", weight = FALSE) {
     # collapse categories inwardly so we have dichotomous measure
     # collapsed levels could be added in dict instead of hard-coded, e.g. response_col = "Infrequently" for "Never" and "Sometimes"
     # ^ probably necessary as collapsing varies by response set
-    d <- mutate(d, response = fct_collapse(response,
-                                           Infrequently = c("Never", "Sometimes"),
-                                           Frequently = c("Often", "Very often"))) |>
+    d <- mutate(d,
+                response = fct_collapse(response,
+                                        Infrequently = c("Never", "Sometimes"),
+                                        Frequently = c("Often", "Very often"))) |>
       summarize(p = sum(p), .by = c(grp, label, response)) |>
       # keep only "upper" RO
       filter(response == "Frequently")
+  } else if (type == "Divergent") {
+    d <- mutate(d,
+                p = if_else(response %in% c("Never", "Sometimes"), p * -1, p),
+                response = fct_relevel(response,
+                                       c("Never", "Sometimes",
+                                        "Very often", "Often"))
+                )
   }
 
+  # consider fct_rev(label) earlier as is common to all
   if (type == "Distribution") {
     # reverse factor order so earliest items appear at top
     plt <- ggplot(d, aes(x = p, y = fct_rev(label), fill = response)) +
@@ -87,7 +96,23 @@ plot_fun <- function(id, data, type = "Distribution", weight = FALSE) {
       geom_text(aes(x = p, y = fct_rev(label), label = paste0(round(p), "%")),
                 nudge_y = .2)
     # scale according to diff?
+  } else if (type == "Divergent") {
+    # divergent bar plot
+  plt <- ggplot(d[d$grp == "g0", ], aes(x = p, y = fct_rev(label),
+                                        fill = response,
+                                        color = grp
+                                        )) +
+      geom_col(position = "stack", width = .25, just = 1) +
+      geom_col(data = d[d$grp == "g1", ],
+               # aes is same, but need to offset y
+               aes(y = fct_rev(label)),
+               width = .25,
+               just = -1) +
+      theme_nsse() +
+      scale_fill_brewer(type = "div")
+      #geom_text(aes(label = paste0(round(p), "%")))
   }
+
   # constant styling and elements regardless of plot type
   # most of this could be kep inside a custom theme instead of calling theme_minimal() and then theme()
   plt <- plt + theme_nsse() +
@@ -105,5 +130,5 @@ plot_fun <- function(id, data, type = "Distribution", weight = FALSE) {
 # e.g.
 # plot_fun(data, type = "dumbbell")
 # plot_fun(data, type = "stacked_col")
-
+# plot_fun(data = data, type = "Divergent")
 
