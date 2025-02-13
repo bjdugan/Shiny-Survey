@@ -98,7 +98,7 @@ ui <- page_navbar(
     ),
     radioButtons("plot_type",
                  label = "Show side-by-side bar plots or dumbells for distribution.",
-                 choices = c("Distribution", "Differences"),
+                 choices = c("Distribution", "Differences", "Divergent"),
                  selected = "Distribution"
     ),
     # selectInput("useInstColors",
