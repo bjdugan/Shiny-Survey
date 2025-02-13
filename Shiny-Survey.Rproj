@@ -1,22 +1,3 @@
-<<<<<<< HEAD
-Version: 1.0
-ProjectId: 4bb7ace2-64a6-4c1f-8f4f-66905a44c2c8
-
-RestoreWorkspace: Default
-SaveWorkspace: Default
-AlwaysSaveHistory: Default
-
-EnableCodeIndexing: Yes
-UseSpacesForTab: Yes
-NumSpacesForTab: 2
-Encoding: UTF-8
-
-RnwWeave: Sweave
-LaTeX: pdfLaTeX
-
-AutoAppendNewline: Yes
-StripTrailingWhitespace: Yes
-=======
 Version: 1.0
 ProjectId: 5ea57a2d-f41b-4049-b434-20dcfed71734
 
@@ -34,4 +15,3 @@ LaTeX: pdfLaTeX
 
 AutoAppendNewline: Yes
 StripTrailingWhitespace: Yes
->>>>>>> c27f855824238e448d31ee5702bd326196505f95
