@@ -6,6 +6,7 @@ library(purrr)
 library(tibble)
 library(odbc)
 library(DBI)
+library(stringr)
 
 # to do:
 # - add peers tables similar to in RF
@@ -17,10 +18,12 @@ library(DBI)
 questions = tibble(
   question_num = 1:3,
   question = c(
-  "During the current school year, about how often have you done the following?",
-  "During the current school year, how much has your coursework emphasized the following?",
-  "To what extent do you agree or disagree with the following statements?"),
-  set = "core")
+    "During the current school year, about how often have you done the following?",
+    "During the current school year, how much has your coursework emphasized the following?",
+    "To what extent do you agree or disagree with the following statements?"),
+  instrument = "NSSE",
+  response_set = c("NSOV", "VSQV", "SDNAS")
+)
 
 # a table of each item, stem, wording, its module or set, and its response set
 items <- tibble(
@@ -56,9 +59,19 @@ response_options <- tibble(
   value = c(1:4, 1:4, 1:5),
   response_set = c(rep("NSOV", 4), rep("VSQV", 4), rep("SDNAS", 5)))
 
+# a table of item grouping and audiences (for later)
+item_groups <- tibble(
+  item = c("CLaskhelp", "CLexplain", "CLstudy", "CLproject",
+           "HOapply", "HOanalyze", "HOevaluate", "HOform",
+           "sbmyself", "sbvalued", "sbcommunity"),
+  grouping = c("CL", "CL", "CL", "CL", "HO", "HO", "HO", "HO", "sb", "sb", "sb"),
+  audience = "Some audience"
+)
+
 # response_options are nested within items are nested within questions:
 nest_join(items, response_options, by = "response_set")
 nest_join(questions, items, by = "question_num")
+nest_join(questions, response_options, by = "response_set")
 
 # institutional information ####
 # create some basic, IPEDS-like information for a handful of institutions
@@ -116,20 +129,65 @@ nest_join(institutions, respondents, by = "unitid")
 con <- dbConnect(RSQLite::SQLite(), ":memory:")
 
 tables <- list(institutions, respondents, responses, questions, items,
-               response_options) |>
+               response_options, item_groups) |>
   set_names(c("institutions", "respondents", "responses", "questions", "items",
-              "response_options"))
+              "response_options", "item_groupings"))
 
-map2(names(tables), tables, \(x, y) dbWriteTable(con, x, y))
+# add PK and FK constraints; SQLite tables can't have constraints added ex post facto
+# write a set of create table queries
+x <- map(tables, map, class) |>
+  map(as_tibble) |>
+  map(pivot_longer, everything()) |>
+  imap(mutate) |>
+  map(rename, col = name, type = value, table = last_col()) |>
+  bind_rows() |>
+  # coerce to SQL types: int, nvarchar (for text and factors), double,
+  # add primary keys; may not support composite pks in create table - add constraint
+  mutate(
+    type = case_when(type %in% c("character", "factor") ~ "text",
+                     type == "integer" ~ "int",
+                     type == "numeric" ~ "num"),
+    pk = if_else(
+      (table == "institutions" & col == "unitid") |
+        (table == "respondents" & col == "id") |
+        (table == "items" & col == "item"),
+      # does item_groupings need pk?...note ws before PRIMARY for sytnax
+      " PRIMARY KEY", ""
+    ),
+  ) |>
+  group_by(table) |>
+  summarize(statement = paste0(col, " ", type, pk, ",", collapse = "\n")) |>
+  # add composite pk's
+  mutate(statement = case_when(
+    table == "responses" ~ paste0(statement, "\nPRIMARY KEY (id, item)"),
+    table == "question" ~ paste0(statement, "\nPRIMARY KEY (instrument, question_num)"),
+    # not sure if needs pk...
+    table == "response_options" ~ paste0(statement,
+                                         "\nPRIMARY KEY (response, value, response_set)"),
+    TRUE ~ statement)
+    # could add fk here, e.g. for questions
+    # FOREIGN KEY (response_set) REFERENCES response_options (response_set)
+  ) |>
+  transmute(statement = paste0("\nCREATE TABLE ", table, " (\n", statement, "\n);") |>
+              str_squish() |>
+              str_replace(", \\)", ")")
+              )
+cat(x[1, ]$statement)
+
+# create tables
+map(x$statement, \(x) dbExecute(con, x))
+
+# populate tables
+map2(names(tables), tables, \(x, y) dbAppendTable(con, x, y))
 
 # confirm
 tbl(con, "items")
-tbl(con, "responses")
-
-# add PK and FK constraints and then plot ERD with package dm (adding these should avoid needing toa dd them one at a time)
+tbl(con, "questions")
 
 # add View for dictionary, perhaps others...
-left_join(tbl(con, "items"), tbl(con, "questions"), by = "question_num") |>
+left_join(tbl(con, "items"),
+          tbl(con, "questions"),
+          by = c("question_num", "response_set")) |>
   left_join(tbl(con, "response_options"), by = "response_set") |>
   explain()
 
@@ -138,17 +196,15 @@ dbExecute(con, "DROP VIEW IF EXISTS dictionary;")
 # adapted and tidied from show_query()/explain(); note `set` in back-tics as SET is reserved
 dbExecute(con,
           "CREATE VIEW dictionary AS
-          SELECT question_num, item_alpha, survey_order, item, label,
-          COALESCE(LHS.response_set, response_options.response_set) AS response_set,
-          question, `set`, response, value
-          FROM (
-            SELECT items.*, question, `set`
-            FROM items
-            LEFT JOIN questions
-            ON (items.question_num = questions.question_num)
-          ) AS LHS
-          FULL JOIN response_options
-          ON (LHS.response_set = response_options.response_set);")
+          SELECT `items`.*, `question`, `instrument`, `response`, `value`
+          FROM `items`
+          LEFT JOIN `questions`
+          ON (
+          `items`.`question_num` = `questions`.`question_num` AND
+          `items`.`response_set` = `questions`.`response_set`
+          )
+          LEFT JOIN `response_options`
+          ON (`items`.`response_set` = `response_options`.`response_set`);")
 # confirm
 tbl(con, "dictionary")
 
