@@ -36,7 +36,10 @@ groups are shown in green.
 
     ## Keys could not be queried.
 
-![](survey-database_files/figure-markdown_github/unnamed-chunk-1-1.png)
+<figure>
+<img src="survey_erd.svg" alt="Survey ERD" />
+<figcaption aria-hidden="true">Survey ERD</figcaption>
+</figure>
 
 ## Questions
 

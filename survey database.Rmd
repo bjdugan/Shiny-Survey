@@ -35,9 +35,9 @@ The following describes the basic relationships within a survey database. Some f
 
 Views built upon tables are show in darker shades. Respondent and response-level data, which may include populations, are shown in salmon while institution-level tables, which may include selected comparison groups are shown in green.
  
-```{r, fig.width=10, fig.height=10}
+```{r}
 # can't detect keys from SQLite db, add manually
-dm_from_con(con) |> 
+survey_dm <- dm_from_con(con) |> 
   dm_add_pk(institutions, unitid) |> 
   dm_add_pk(respondents, id) |> 
   dm_add_pk(items, item) |> 
@@ -61,8 +61,11 @@ dm_from_con(con) |>
     columnArrows = TRUE,
     column_types = TRUE
   )
-```
+DiagrammeRsvg::export_svg(survey_dm) |> 
+  writeLines("survey_erd.svg")
 
+```
+![Survey ERD](survey_erd.svg)
 
 ## Questions
 An example of the questions table. Each row consists of the question number, text of the question itself, and the instrument to which it belongs. Questions are not unique but differentiated by number and instrument; the combination of all three uniquely identify them. The *College Student Report*, [for instance](https://nsse.indiana.edu/nsse/survey-instruments/us-english.html), has the same prompt ("During the current school year, ...") for the first three items, which are internally differentiated by Engagement Indicators (factors). (The prompt is not repeated in the online version of the survey). The same prompts are also used in other sets (other instruments), like topical modules, though they may be in different order.
