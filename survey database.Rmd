@@ -83,7 +83,7 @@ tbl(con, "items")
 
 ### Other item groupings
 `set` indicates the instrument an question and ergo items belong to, but there are other item groupings, such as Engagement Indicators and the four overarching themes, High-impact Practices, time use, and perceived gains, among others. This mostly pertains to organization within the core survey based on a priori factor structures and design. Other item groupings might include reporting audiences (e.g., executive, advisors). 
-How should this be handled? For the former issue, `set` could be more specific, e.g., "AAD" for the advising module, but "core-CL" for the core survey's Collaborative Learning items. Alternatively, `set` could be replaced with `instrument` or `module` (I think CSR uses this term to mean a set of items) and then `set` could indicate for core survey the secondary grouping and for other items inherit from instrument (or have no value at all) within the items table:
+How should this be handled? For the former issue, `set` could be more specific, e.g., "AAD" for the advising module, but "core-CL" for the core survey's Collaborative Learning items. Alternatively, `set` could be replaced with `instrument` or `module` (I think others use this term to mean a set of items) and then `set` could indicate for core survey the secondary grouping and for other items inherit from instrument (or have no value at all) within the items table:
 ```{r}
 tibble(
   instrument = c("AAD", "NSSE", "NSSE"),
@@ -107,7 +107,7 @@ It might be a good idea to replace "core" with "NSSE" for NSSE's set value.
 ## Response options
 An example of a table of response options. Response is the human-readable label included verbatim from the instrument, value is the numeric value assigned in the dataaset, and response set indicates which set it belongs to. Like with questions, the three combine to uniquely identify rows. Response set is a reasonably short and unique abbreviation for responses, e.g., "NSOV" is "Never Sometimes Often Very often". Response options are linked to items by response set. 
 
-Responses should be ordered by value, not appearance on survey (e.g., if reverse-ordered), which would need to be captured elsewhere (if at all for reporting - that's more of CSR's business).
+Responses should be ordered by value, not appearance on survey (e.g., if reverse-ordered), which would need to be captured elsewhere (if at all for reporting).
 ```{r}
 tbl(con, "response_options")
 ```

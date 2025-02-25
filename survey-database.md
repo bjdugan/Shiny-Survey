@@ -100,10 +100,10 @@ groupings might include reporting audiences (e.g., executive, advisors).
 How should this be handled? For the former issue, `set` could be more
 specific, e.g., “AAD” for the advising module, but “core-CL” for the
 core survey’s Collaborative Learning items. Alternatively, `set` could
-be replaced with `instrument` or `module` (I think CSR uses this term to
-mean a set of items) and then `set` could indicate for core survey the
-secondary grouping and for other items inherit from instrument (or have
-no value at all) within the items table:
+be replaced with `instrument` or `module` (I think others use this term
+to mean a set of items) and then `set` could indicate for core survey
+the secondary grouping and for other items inherit from instrument (or
+have no value at all) within the items table:
 
     ## # A tibble: 3 × 3
     ##   instrument set          item     
@@ -137,7 +137,7 @@ often”. Response options are linked to items by response set.
 
 Responses should be ordered by value, not appearance on survey (e.g., if
 reverse-ordered), which would need to be captured elsewhere (if at all
-for reporting - that’s more of CSR’s business).
+for reporting).
 
     ## # Source:   table<`response_options`> [?? x 3]
     ## # Database: sqlite 3.45.2 [C:\Users\bjdugan\Documents\projects\reporting\Shiny-Survey\nsse.db]
