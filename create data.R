@@ -16,21 +16,33 @@ library(stringr)
 # instrument codebooks ####
 # a table of each stem or question as it appears on the survey
 questions = tibble(
-  question_num = 1:3,
+  question_num = 1:7,
   question = c(
     "During the current school year, about how often have you done the following?",
     "During the current school year, how much has your coursework emphasized the following?",
-    "To what extent do you agree or disagree with the following statements?"),
+    "To what extent do you agree or disagree with the following statements?",
+    "Which of the following have you done while in college or do you plan to do before you graduate?",
+    "About how many of your courses at this institution have included a community-based project (service-learning)?",
+    "About how many hours do you spend in a typical 7-day week doing the following?",
+    "Indicate the quality of your interactions with the following people at your institution."
+    ),
   instrument = "NSSE",
-  response_set = c("NSOV", "VSQV", "SDNAS")
+  response_set = c("NSOV", "VSQV", "SDNAS", "HDPD", "NSMA", "HpW",
+                   "poor_excellent")
 )
 
 # a table of each item, stem, wording, its module or set, and its response set
 items <- tibble(
-  question_num = c(1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3),
+  question_num = c(rep(1, 4), rep(2, 4), rep(3, 3), rep(4, 6), 5, rep(6, 8),
+                   rep(7, 5)),
   item = c("CLaskhelp", "CLexplain", "CLstudy", "CLproject",
            "HOapply", "HOanalyze", "HOevaluate", "HOform",
-           "sbmyself", "sbvalued", "sbcommunity"),
+           "sbmyself", "sbvalued", "sbcommunity",
+           "intern", "leader", "learncom", "abroad", "research", "capstone",
+           "servcourse",
+           "tmprep", "tmcocurr", "tmworkon", "tmworkoff", "tmservice", "tmrelax",
+           "tmcare", "tmcommute",
+           "QIstudent", "QIadvisor", "QIfaculty", "QIstaff", "QIadmin"),
   label = c(
     "Asked another student to help you understand course material",
     "Explained course material to one or more students",
@@ -42,9 +54,31 @@ items <- tibble(
     "Forming a new idea or understanding from various pieces of information",
     "I feel comfortable being myself at this institution.",
     "I feel valued by this institution.",
-    "I feel like a part of the community at this institution."),
+    "I feel like a part of the community at this institution.",
+    "Participate in an internship, co-op, field experience, student teaching, or clinical placement",
+    "Hold a formal leadership role in a student organization or group",
+    "Participate in a learning community or some other formal program where groups of students take two or more classes together",
+    "Participate in a study abroad program",
+    "Work with a faculty member on a research project",
+    "Complete a culminating senior experience (capstone course, senior project or thesis, portfolio, recital, comprehensive exam, etc.)",
+    # servcourse question is label - no subitems/matrix
+    "About how many of your courses at this institution have included a community-based project (service-learning)?",
+    "Preparing for class (studying, reading, writing, doing homework or lab work, analyzing data, rehearsing, and other academic activities)",
+    "Participating in co-curricular activities (organizations, campus publications, student government, fraternity or sorority, intercollegiate or intramural sports, etc.)",
+    "Working for pay on campus",
+    "Working for pay off campus",
+    "Doing community service or volunteer work",
+    "Relaxing and socializing (time with friends, video games, TV or videos, keeping up with friends online, etc.)",
+    "Providing care for dependents (children, parents, etc.)",
+    "Commuting to campus (driving, walking, etc.)",
+    "Students", "Academic advisors", "Faculty",
+    "Student services staff (career services, student activities, housing, etc.)",
+    "Other administrative staff and offices (registrar, financial aid, etc.)"
+    ),
   # some short, unique code for response option labels
-  response_set = c(rep("NSOV", 4), rep("VSQV", 4), rep("SDNAS", 3)) ) |>
+  response_set = c(rep("NSOV", 4), rep("VSQV", 4), rep("SDNAS", 3),
+                   rep("HDPD", 6), "NSMA", rep("HpW", 8), rep("poor_excellent", 5))
+  ) |>
   mutate(item_alpha = letters[row_number()],
          survey_order = paste0(question_num, item_alpha),
          .by = question_num) |>
@@ -52,19 +86,52 @@ items <- tibble(
 
 # a table of unique response option sets and their values
 response_options <- tibble(
-  response = c("Never", "Sometimes", "Often", "Very often",
-               "Very little", "Some", "Quite a bit", "Very much",
-               "Strongly disagree", "Disagree", "Neither agree nor disagree",
-               "Agree", "Strongly agree"),
-  value = c(1:4, 1:4, 1:5),
-  response_set = c(rep("NSOV", 4), rep("VSQV", 4), rep("SDNAS", 5)))
+  response = c(
+    # standard Likert items
+    "Never", "Sometimes", "Often", "Very often",
+    "Very little", "Some", "Quite a bit", "Very much",
+    "Strongly disagree", "Disagree", "Neither agree nor disagree",
+    "Agree", "Strongly agree",
+    # HIP items
+    "Have not decided", "Do not plan to do", "Plan to do", "Done or in progress",
+    # service learning and similar items
+    "None", "Some", "Most", "All",
+    # time use
+    "0 Hours per week", "1-5", "6-10", "11-15", "16-20", "21-25", "26-30",
+    "More than 30",
+    # range with endpoints labelled only, and N/A level
+    # unfortunately these appear as Value=Response & vice versa, Response<br>Value, etc. Keeping value first should help with ordering.
+    "1 Poor", 2:6, "7 Excellent", "Not applicable"),
+  value = c(1:4, 1:4, 1:5, 1:4, 1:4, 1:8, 1:8),
+  response_set = c(rep("NSOV", 4), rep("VSQV", 4), rep("SDNAS", 5),
+                   rep("HDPD", 4), rep("NSMA", 4),
+                   rep("HpW", 8),
+                   rep("poor_excellent", 8))
+  )
 
 # a table of item grouping and audiences (for later)
 item_groups <- tibble(
   item = c("CLaskhelp", "CLexplain", "CLstudy", "CLproject",
            "HOapply", "HOanalyze", "HOevaluate", "HOform",
-           "sbmyself", "sbvalued", "sbcommunity"),
-  grouping = c("CL", "CL", "CL", "CL", "HO", "HO", "HO", "HO", "sb", "sb", "sb"),
+           "sbmyself", "sbvalued", "sbcommunity",
+           # hips
+           "intern", "leader", "learncom", "abroad", "research", "capstone",
+           "servcourse",
+           # time use
+           "tmprep", "tmcocurr", "tmworkon", "tmworkoff", "tmservice", "tmrelax",
+           "tmcare", "tmcommute",
+           # QI
+           "QIstudent", "QIadvisor", "QIfaculty", "QIstaff", "QIadmin"
+           ),
+  grouping = c(rep("CL", 4), rep("HO", 4), rep("sb", 3),
+               rep("HIP", 7), rep("tm", 8), rep("QI", 5)),
+  grouping_label = c(rep("Collaborative Learning", 4),
+                     rep("Higher-order Learning", 4),
+                     rep("Sense of Belonging", 3),
+                     rep("High-impact Practices", 7),
+                     rep("Time use", 8),
+                     rep("Quality of Interactions", 5)
+                     ),
   audience = "Some audience"
 )
 
